@@ -109,8 +109,9 @@ for (i in 1:nrow(hits)) {
 ## Get the acousticness
 ## Requites OAuth
 ## First get your OAuth token
-clientID = '6d5ad90082724978a14ae7b932ace839'
-secret = '863ea8a98d5e4ef7b3d5489667fb2006'
+## I've left it blank below because you need to get your own API keys
+clientID = ''
+secret = ''
 response = POST(
   'https://accounts.spotify.com/api/token',
   accept_json(),
