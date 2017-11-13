@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<head>
+<meta charset="utf-8">
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<!-- Latest compiled and minified CSS -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+
+<!-- jQuery library -->
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+<!-- Latest compiled JavaScript -->
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+
+<!-- Boxplot JS -->
+<script src="box.js"></script>
+
+
+<link rel="stylesheet" type="text/css" href="mystyle.css"></link>
+<style>
+
+
+
+.bar rect {
+  shape-rendering: crispEdges;
+}
+
+.bar text {
+  fill: #999999;
+}
+
+.axis path, .axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+button {
+  height: 1.5em;
+  background: #0a2040;
+  border: 1px solid #0a2040;
+  border-radius: 3px;
+  color: white;
+  font-size: 1.5em;
+}
+
+#playall {
+  width: 8em;
+}
+
+button:focus {
+  outline: none;
+}
+
+
+
+.box {
+  font: 10px sans-serif;
+}
+
+.box line,
+.box rect,
+.box circle {
+  fill: #0a2040;
+  stroke: #0a2040;
+  stroke-width: 1px;
+}
+
+.box .center {
+  stroke-dasharray: 3,3;
+}
+
+.box .outlier {
+  fill: none;
+  stroke: #000;
+}
+
+ 
+.x.axis path { 
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+</style>
+</head>
+<body>
+
+<nav class="navbar navbar-default navbar-fixed-top">
+  <div class="container">
+    <div class="navbar-header">
+      <a  class="navbar-brand" href="http://bambooanalytics.co/">   
+      <img id="logo" src="photos/Bamboo_Logo_Color_Reverse.png" alt="bamboo" style="height:60px; margin-top: -20px;">
+    </a>
+    </div>
+  </div>
+</nav> 
+
+<div class="jumbotron text-center">
+  <div class="mytitle">
+  <h1>Survey Results</h1> 
+  <p>The votes are in</p> 
+  </div>
+</div>
+
+<div id="introduction" class="container mycontainer">
+  <br />
+  <p>
+  The 60s are recognized as a time of cultural disruption in the US. Popular music, in particular, was shifting from jazz to folk to rock n' roll. These changes were huge. Additionally, there have been changes since: the emergence of hip-hop, iterations of rock music, and the amalgamation of it all. As someone who didn't experience those times, I do wonder if the shifts then were greater than the shifts today.  
+  </p>
+  <br />
+  <p>
+  To explore this, I combined Billboard Hot 100 and Spotify's metadata. The Billboard Hot 100 first appeared in 1959 with shorter forms like the Hot 30 appearing in the early 40s. Spotify provides metadata for many songs which includes song information like key, tempo, danceability, and acousticness. I focused in on acousticness because it provides a normalized score between 0 and 1 (0 meaning less likely and 1 being more likely acoustic) and I thought that this might provide one of the more telling shifts about the music of the 50s.  
+  </p>
+</div>
+
+<div class="container mycontainer">
+  <h2>The Acousticness of Music Over Time</h2>
+  <button name="play" id="playall">Play All Years</button>
+  <button id = "1950">1950</button>
+  <button id = "1960">1960</button>
+  <button id = "1970">1970</button>
+  <button id = "1980">1980</button>
+  <button id = "1990">1990</button>
+  <button id = "2000">2000</button>
+  <button id= "2010">2010</button>
+  <div id="acousticnessgraph">
+  </div>
+</div>
+
+
+<div class="container mycontainer">
+  <p>
+  As shown in the data, the acousticness of pop music has shifted a lot over the years. How can you quantify these shifts to objectively decide that these distributions are different? There's many methods out there -- I used ROC curves to draw some inferences. From an ROC curve, you can get the area under the curve (AUC) which will typically be between .5 and 1. For AUCs closer to .5, the more the distributions overlap. For AUCs closer to 1, the more distinct the distributions are. Furthermore, to get an idea of estimating the variance (important for drawing inferences), I bootstrapped the AUCs and below are those distributions.
+  </p>
+</div> 
+
+<div class="container mycontainer">
+  <h2>Distinctness of the Decades</h2>
+  <div id="boxplots">
+  </div>
+</div>
+
+
+
+<div class="container mycontainer">
+  <p>
+  As a reminder, AUCs closer to .5 indicate little difference where those closer to 1 indicate a greater distinctness. Interestingly, both the 50s and 60s had similar shifts in the acousticness of pop music. The additional variance for the 50s exists because the Billboard Hot 100s was actually a Hot 30 at that time.
+  </p>
+</div>
+
+
+
+
+
+<script>
+
+d3.csv("acousticness2.csv", function(error, data) {
+
+var fullData = data;
+var color = "#0a2040";
+
+// How to subset data to look like test data
+// and listen to inputs from the whatchamacallit
+
+var testData = d3.values(data).filter(function(d) {
+  return d.Year == 1955;
+});
+
+var values = [];
+testData.map(function(d) {
+  values.push(d.Acousticness);
+});
+
+// A formatter for counts.
+var formatCount = d3.format(",.0f");
+
+var margin = {top: 20, right: 30, bottom: 30, left: 30},
+    width = 700 - margin.left - margin.right,
+    height = 400 - margin.top - margin.bottom;
+
+var max = 1;
+var min = 0;
+var x = d3.scale.linear()
+      .domain([min, max])
+      .range([0, width]);
+
+// Generate a histogram using twenty uniformly-spaced bins.
+var data = d3.layout.histogram()
+    .bins(x.ticks(20))
+    (values);
+
+var yMax = d3.max(data, function(d){return d.length});
+var yMin = d3.min(data, function(d){return d.length});
+var colorScale = d3.scale.linear()
+            .domain([yMin, yMax])
+            .range([d3.rgb(color).brighter(), d3.rgb(color).darker()]);
+
+var y = d3.scale.linear()
+    .domain([0, yMax])
+    .range([height, 0]);
+
+var xAxis = d3.svg.axis()
+    .scale(x)
+    .orient("bottom");
+
+var svg = d3.select("#acousticnessgraph").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+  .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+var bar = svg.selectAll(".bar")
+    .data(data)
+  .enter().append("g")
+    .attr("class", "bar")
+    .attr("transform", function(d) { return "translate(" + x(d.x) + "," + y(d.y) + ")"; });
+
+bar.append("rect")
+    .attr("x", 1)
+    .attr("width", (x(data[0].dx) - x(0)) - 1)
+    .attr("height", function(d) { return height - y(d.y); })
+    .attr("fill", function(d) { return colorScale(d.y) });
+
+svg.append("text")
+    .attr("y", 50)
+    .attr("x", width - 50)
+    .text("1955");
+
+svg.append("g")
+    .attr("class", "x axis")
+    .attr("transform", "translate(0," + height + ")")
+    .call(xAxis);
+
+/*
+* Adding refresh method to reload new data
+*/
+function refresh(values, year){
+  // var values = d3.range(1000).map(d3.random.normal(20, 5));
+  var data = d3.layout.histogram()
+    .bins(x.ticks(20))
+    (values);
+
+  // Reset y domain using new data
+  var yMax = d3.max(data, function(d){return d.length});
+  var yMin = d3.min(data, function(d){return d.length});
+  y.domain([0, yMax]);
+  var colorScale = d3.scale.linear()
+              .domain([yMin, yMax])
+              .range([d3.rgb(color).brighter(), d3.rgb(color).darker()]);
+
+  var bar = svg.selectAll(".bar").data(data);
+
+  // Remove object with data
+  bar.exit().remove();
+
+  bar.transition()
+    .duration(500)
+    .attr("transform", function(d) { return "translate(" + x(d.x) + "," + y(d.y) + ")"; });
+
+  bar.select("rect")
+      .transition()
+      .duration(500)
+      .attr("height", function(d) { return height - y(d.y); })
+      .attr("fill", function(d) { return colorScale(d.y) });
+
+  svg.select("text")
+    .transition()
+    .delay(100)
+    .duration(500)
+    .attr("y", 50)
+    .attr("x", width - 50)
+    .text(function(d) {return year;});
+};
+
+var running = false;
+var timer;
+var i = 1950;
+var howManyTimes = 2016;
+
+$("#1960").on("click", function() {
+
+  var tempData = d3.values(fullData).filter(function(d) {
+        return d.Year == 1960;
+      });
+  var values = [];
+  tempData.map(function(d) {
+        values.push(d.Acousticness);
+  });
+  // var values = test[section][0];
+  refresh(values, 1960);
+
+
+});
+
+$("#1970").on("click", function() {
+
+  var tempData = d3.values(fullData).filter(function(d) {
+        return d.Year == 1970;
+      });
+  var values = [];
+  tempData.map(function(d) {
+        values.push(d.Acousticness);
+  });
+  // var values = test[section][0];
+  refresh(values, 1970);
+
+
+});
+
+$("#1980").on("click", function() {
+
+  var tempData = d3.values(fullData).filter(function(d) {
+        return d.Year == 1980;
+      });
+  var values = [];
+  tempData.map(function(d) {
+        values.push(d.Acousticness);
+  });
+  // var values = test[section][0];
+  refresh(values, 1980);
+
+
+});
+
+$("#1990").on("click", function() {
+
+  var tempData = d3.values(fullData).filter(function(d) {
+        return d.Year == 1990;
+      });
+  var values = [];
+  tempData.map(function(d) {
+        values.push(d.Acousticness);
+  });
+  // var values = test[section][0];
+  refresh(values, 1990);
+
+
+});
+
+$("#2000").on("click", function() {
+
+  var tempData = d3.values(fullData).filter(function(d) {
+        return d.Year == 2000;
+      });
+  var values = [];
+  tempData.map(function(d) {
+        values.push(d.Acousticness);
+  });
+  // var values = test[section][0];
+  refresh(values, 2000);
+
+
+});
+
+$("#2010").on("click", function() {
+
+  var tempData = d3.values(fullData).filter(function(d) {
+        return d.Year == 2010;
+      });
+  var values = [];
+  tempData.map(function(d) {
+        values.push(d.Acousticness);
+  });
+  // var values = test[section][0];
+  refresh(values, 2010);
+
+
+});
+
+$("#playall").on("click", function() {
+  
+  if (running == true) {
+    if (i == 0) {
+      $("#playall").html("Play All Years");
+      running = false;
+      clearInterval(timer);
+    } else if (i < howManyTimes) {
+      $("#playall").html("Resume");
+      running = false;
+      clearInterval(timer);
+    } else {
+      $("#playall").html("Play All Years");
+      running = false;
+      i = 1955;
+      clearInterval(timer);
+    } 
+  } 
+
+  else if (running == false) {
+    $("#playall").html("Pause");
+    // Calling refresh repeatedly.
+    timer = setInterval(function() {
+      var tempData = d3.values(fullData).filter(function(d) {
+        return d.Year == i;
+      });
+      var values = [];
+      tempData.map(function(d) {
+        values.push(d.Acousticness);
+      });
+      if (i < howManyTimes) {
+        ++i;
+        running = true;
+        refresh(values, i);
+      } else if (i == howManyTimes) {
+        $("#playall").html("Play All Years");
+        refresh(values,i);
+        running = false;
+        i = 1955;
+        clearInterval(timer);
+      };    
+    }, 500);
+  }
+
+});
+});
+</script>
+
+
+
+<script>
+var margin = {top: 30, right: 50, bottom: 70, left: 50};
+var  width = 700 - margin.left - margin.right;
+var height = 400 - margin.top - margin.bottom;
+  
+var min = Infinity,
+    max = -Infinity;
+  
+// parse in the data  
+d3.csv("data2.csv", function(error, csv) {
+  // using an array of arrays with
+  // data[n][2] 
+  // where n = number of columns in the csv file 
+  // data[i][0] = name of the ith column
+  // data[i][1] = array of values of ith column
+
+  var data = [];
+  data[0] = [];
+  data[1] = [];
+  data[2] = [];
+  data[3] = [];
+  data[4] = [];
+  data[5] = [];
+  // add more rows if your csv file has more columns
+
+  // add here the header of the csv file
+  data[0][0] = "50s";
+  data[1][0] = "60s";
+  data[2][0] = "70s";
+  data[3][0] = "80s";
+  data[4][0] = "90s";
+  data[5][0] = "00s";
+  // add more rows if your csv file has more columns
+
+  data[0][1] = [];
+  data[1][1] = [];
+  data[2][1] = [];
+  data[3][1] = [];
+  data[4][1] = [];
+  data[5][1] = [];
+  
+  csv.forEach(function(x) {
+    var v1 = Math.round(x.X50s * 100) / 100;
+      v2 = Math.round(x.X60s * 100) / 100;
+      v3 = Math.round(x.X70s * 100) / 100;
+      v4 = Math.round(x.X80s * 100) / 100;
+      v5 = Math.round(x.X90s * 100) / 100;
+      v6 = Math.round(x.X00s * 100) / 100;
+
+
+      // add more variables if your csv file has more columns
+      
+    var rowMax = Math.max(v1, Math.max(v2, Math.max(v3, Math.max(v4, Math.max(v5, v6)))));
+    var rowMin = Math.min(v1, Math.min(v2, Math.min(v3, Math.min(v4, Math.max(v5, v6)))));
+
+    data[0][1].push(v1);
+    data[1][1].push(v2);
+    data[2][1].push(v3);
+    data[3][1].push(v4);
+    data[4][1].push(v5);
+    data[5][1].push(v6);
+     // add more rows if your csv file has more columns
+    if (rowMax > max) max = rowMax;
+    if (rowMin < min) min = rowMin; 
+  });
+  
+  var chart = d3.box()
+    .whiskers(iqr(1.5))
+    .height(height) 
+    .domain([min, max]);
+
+  var svg = d3.select("#boxplots").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .attr("class", "box")    
+    .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+  
+  // the x-axis
+  var x = d3.scale.ordinal()     
+    .domain( data.map(function(d) { console.log(d); return d[0] } ) )     
+    .rangeRoundBands([0 , width], 0.7, 0.3);    
+
+  var xAxis = d3.svg.axis()
+    .scale(x)
+    .orient("bottom");
+
+  // the y-axis
+  var y = d3.scale.linear()
+    .domain([min, max])
+    .range([height + margin.top, 0 + margin.top]);
+  
+  var yAxis = d3.svg.axis()
+    .scale(y)
+    .orient("left");
+
+  // draw the boxplots  
+  svg.selectAll(".box")    
+      .data(data)
+    .enter().append("g")
+    .attr("transform", function(d) { return "translate(" +  x(d[0])  + "," + margin.top + ")"; } )
+      .call(chart.width(x.rangeBand())); 
+  
+ 
+   // draw y axis
+  svg.append("g")
+        .attr("class", "y axis")
+        .call(yAxis);
+     
+  // draw x axis  
+  svg.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + (height  + margin.top + 10) + ")")
+      .call(xAxis); 
+});
+
+// Returns a function to compute the interquartile range.
+function iqr(k) {
+  return function(d, i) {
+    var q1 = d.quartiles[0],
+        q3 = d.quartiles[2],
+        iqr = (q3 - q1) * k,
+        i = -1,
+        j = d.length;
+    while (d[++i] < q1 - iqr);
+    while (d[--j] > q3 + iqr);
+    return [i, j];
+  };
+}
+
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script>
+$(document).ready(function(){       
+   var scroll_start = 0;
+   var startchange = $('#introduction');
+   var offset = startchange.offset().top - 100;
+   $(document).scroll(function() { 
+      scroll_start = $(this).scrollTop();
+      if(scroll_start > offset) {
+          $('.navbar').css({
+      "background-color": "#fff",
+      "border-bottom": "1px solid"});
+      $('.navbar-brand img').attr('src','photos/Bamboo_Logo_Color_Positive.png');
+      $('.navbar-nav li a:hover, .navbar-nav li.active a').css({"color": "#0a2040"});
+      $('.navbar-default .navbar-toggle').css({
+        "border-style": "solid !important",
+        "color": "#d5d5d5"});
+      $('.navbar li a, .navbar .navbar-brand').css({"color":"#0a2040"});
+       } else {
+          $('.navbar').css({
+      "background-color": "transparent",
+      "border-bottom": "none"
+      });
+      $('.navbar-brand img').attr('src', 'photos/Bamboo_Logo_Color_Reverse.png');
+      $('.navbar-nav li a:hover, .navbar-nav li.active a').css({"color": "#0a2040"});
+      $('.navbar-default .navbar-toggle').css({
+        "border-color": "transparent",
+        "color": "#fff"});
+      $('.navbar li a, .navbar .navbar-brand').css({"color":"#fff"});
+       }
+   });
+});
+</script>
+</body>
+</html>
